@@ -1,0 +1,46 @@
+[build-system]
+requires      = ["setuptools~=67.6", "wheel~=0.40.0"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name        = "datoso_seed_nointro"
+description = "Python command line tool to download and organize your Rom Dat files."
+readme      = "README.md"
+requires-python = ">=3.10"
+license     = {text = "MIT License"}
+authors     = [
+    {name = 'Lacides Miranda', email = 'laromicas@hotmail.com'},
+]
+keywords = ["emulators", "roms"]
+classifiers = [
+    'Development Status :: 3 - Alpha',
+    "Environment :: Console",
+    'License :: OSI Approved :: MIT License',
+    "Operating System :: POSIX :: Linux",
+    'Programming Language :: Python :: 3',
+    'Topic :: System :: Emulators',
+]
+dependencies = [
+    "datoso>=0.2.0",
+    "selenium==4.8.3",
+]
+dynamic = ["version"]
+
+
+[project.optional-dependencies]
+
+dev = [
+    "ruff>=0.0.261",
+    ]
+
+[project.urls]
+"Source Code"       = "https://github.com/laromicas/datoso_seed_nointro"
+
+[tool.setuptools]
+packages = ["datoso_seed_nointro"]
+license-files = ["LICENSE"]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "datoso_seed_nointro.__version__"}
