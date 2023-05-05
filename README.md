@@ -17,7 +17,6 @@ Install firefox and geckodriver, put geckodriver in your path.
 [Tutorial](https://www.browserstack.com/guide/geckodriver-selenium-python)
 
 Use pip (recommended to use a virtual environment):
-
 If you only need this plugin you can install it directly
 ``` bash
 pip install datoso_seed_nointro
