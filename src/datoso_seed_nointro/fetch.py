@@ -1,5 +1,4 @@
 from pathlib import Path
-import shutil
 import sys
 import time
 import random
@@ -8,9 +7,10 @@ import zipfile
 from selenium import webdriver
 from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.common.by import By
+from datoso.helpers import FileUtils
+from datoso.configuration.folder_helper import Folders
 
 from datoso_seed_nointro import __preffix__
-from datoso.configuration.folder_helper import Folders
 
 
 def execute_with_retry(method, max_attempts):
@@ -137,7 +137,7 @@ def download_dats(folder_helper: Folders):
     downloaded_file = get_downloaded_file(folder_helper)
     print('Extracting dats')
     extract_dats(downloaded_file, folder_helper)
-    shutil.move(downloaded_file, folder_helper.backup)
+    FileUtils.move(downloaded_file, folder_helper.backup)
 
 
 def fetch():
