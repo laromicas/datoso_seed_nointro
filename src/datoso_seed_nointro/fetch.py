@@ -43,7 +43,7 @@ def is_download_finished(folder_helper) -> bool:
 
 def downloads_disabled(driver) -> bool:
     """Checks if the downloads in Datomatic are disabled."""
-    words = ['temporary suspended', 'temporary disabled', 'services may be down']
+    words = ['temporary suspended', 'temporary disabled', 'services may be down', 'temporary throttled']
     return any(word in driver.page_source for word in words)
 
 
