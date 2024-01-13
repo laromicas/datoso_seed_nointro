@@ -98,7 +98,7 @@ def download_daily(folder_helper):
 
         print("Downloading")
         sleep_time()
-        download_button = driver.find_element(By.CSS_SELECTOR, "form input[name='lazy_mode']")
+        download_button = driver.find_element(By.CSS_SELECTOR, "form input[value='Download']")
         download_button.click()
 
         while not is_download_finished(folder_helper):
