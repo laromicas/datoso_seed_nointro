@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 import time
 import random
@@ -98,7 +99,18 @@ def download_daily(folder_helper):
 
         print("Downloading")
         sleep_time()
-        download_button = driver.find_element(By.CSS_SELECTOR, "form input[value='Download']")
+        input_valid_values = ['Download!', 'Download']
+        download_button = None
+        for value in input_valid_values:
+            try:
+                download_button = driver.find_element(By.CSS_SELECTOR, "form input[value='" + value + "']")
+                break
+            except Exception as exc:
+                # print(exc)
+                pass
+        if download_button is None:
+            raise Exception("Download button not found")
+
         download_button.click()
 
         while not is_download_finished(folder_helper):
@@ -133,7 +145,11 @@ def extract_dats(downloaded_file, folder_helper: Folders):
 
 def download_dats(folder_helper: Folders):
     download_daily(folder_helper)
-    downloaded_file = get_downloaded_file(folder_helper)
+    try:
+        downloaded_file = get_downloaded_file(folder_helper)
+    except Exception as exc:
+        logging.error(exc)
+        return
     print('Extracting dats')
     extract_dats(downloaded_file, folder_helper)
     FileUtils.move(downloaded_file, folder_helper.backup)
