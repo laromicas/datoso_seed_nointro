@@ -44,14 +44,14 @@ def is_download_finished(folder_helper) -> bool:
 
 def downloads_disabled(driver) -> bool:
     """Checks if the downloads in Datomatic are disabled."""
-    words = ['temporary suspended', 'temporary disabled', 'services may be down', 'temporary throttled']
+    words = ['temporary suspended', 'temporary disabled', 'services may be down', 'temporarily throttled']
     return any(word in driver.page_source for word in words)
 
 
 def download_daily(folder_helper):
     """Downloads the Datomatic Love Pack."""
     options = FirefoxOptions()
-    # options.add_argument("--headless")
+    options.add_argument("--headless")
     options.set_capability("marionette", True)
     options.set_preference("browser.download.folderList", 2)
     options.set_preference("browser.download.manager.showWhenStarting", False)
@@ -68,9 +68,9 @@ def download_daily(folder_helper):
     sleep_time()
 
     try:
-
         if downloads_disabled(driver):
             print("Downloads suspended")
+            logging.error(driver.page_source)
             driver.close()
             return
 
