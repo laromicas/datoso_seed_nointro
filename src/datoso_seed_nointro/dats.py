@@ -61,6 +61,8 @@ class NoIntroDat(XMLDatFile):
         """ Get the date from the dat file. """
         if self.date:
             return self.date
+        if self.version:
+            self.date = self.version
         if self.file:
             result = re.findall(r'\(.*?\)', self.file)
             self.date = result[len(result)-1][1:-1]
