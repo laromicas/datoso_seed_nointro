@@ -1,25 +1,26 @@
 import logging
-from pathlib import Path
-import time
 import random
+import time
 import zipfile
+from pathlib import Path
 
 from selenium import webdriver
 from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.common.by import By
-from datoso.helpers import FileUtils
-from datoso.configuration.folder_helper import Folders
 
-from datoso_seed_nointro import __preffix__
+from datoso.configuration import config
+from datoso.configuration.folder_helper import Folders
+from datoso.helpers import FileUtils
+from datoso_seed_nointro import __prefix__
 
 
 def execute_with_retry(method, max_attempts):
     """Executes a method with several times until it fails all or is executed fine."""
     exc = None
-    for _ in range(0, max_attempts):
+    for _ in range(max_attempts):
         try:
             return method()
-        except Exception as exc:
+        except Exception as exc: # noqa: PERF203
             print(exc)
             time.sleep(1)
     if exc is not None:
@@ -36,10 +37,23 @@ def is_download_finished(folder_helper) -> bool:
     """Checks if the download is finished."""
     firefox_temp_file = sorted(Path(folder_helper.download).glob('*.part'))
     chrome_temp_file = sorted(Path(folder_helper.download).glob('*.crdownload'))
-    downloaded_files = sorted(Path(folder_helper.download).glob('*.*'))
+    downloaded_files = sorted(Path(folder_helper.download).glob('*.zip'))
     return (len(firefox_temp_file) == 0) and \
        (len(chrome_temp_file) == 0) and \
        (len(downloaded_files) >= 1)
+
+
+def delete_temp_files_if_exists(folder_helper: Folders):
+    """Checks if the files are in the folder."""
+    firefox_temp_file = sorted(Path(folder_helper.download).glob('*.part'))
+    chrome_temp_file = sorted(Path(folder_helper.download).glob('*.crdownload'))
+    downloaded_files = sorted(Path(folder_helper.download).glob('*.zip'))
+    for file in firefox_temp_file:
+        file.unlink()
+    for file in chrome_temp_file:
+        file.unlink()
+    for file in downloaded_files:
+        file.unlink()
 
 
 def downloads_disabled(driver) -> bool:
@@ -51,32 +65,34 @@ def downloads_disabled(driver) -> bool:
 def download_daily(folder_helper):
     """Downloads the Datomatic Love Pack."""
     options = FirefoxOptions()
-    options.add_argument("--headless")
-    options.set_capability("marionette", True)
-    options.set_preference("browser.download.folderList", 2)
-    options.set_preference("browser.download.manager.showWhenStarting", False)
-    options.set_preference("browser.download.dir", folder_helper.download)
-    options.set_preference("browser.download.folderList", 2)
+    if config.getboolean('NOINTRO', 'headless', fallback=True):
+        options.add_argument('--headless')
+    options.set_capability('marionette', True)
+    options.set_preference('browser.download.folderList', 2)
+    options.set_preference('browser.download.manager.showWhenStarting', False)
+    options.set_preference('browser.download.dir', str(folder_helper.download))
+    options.set_preference('browser.download.folderList', 2)
 
     driver = webdriver.Firefox(options=options)
 
     driver.implicitly_wait(10)
-    driver.get("https://www.google.com")
+    driver.get('https://www.google.com')
 
-    driver.get("https://datomatic.no-intro.org")
+    driver.get('https://datomatic.no-intro.org')
 
     sleep_time()
 
     try:
         if downloads_disabled(driver):
-            print("Downloads suspended")
+            print('Downloads suspended')
             logging.error(driver.page_source)
             driver.close()
             return
 
-        print("Getting to file download page")
+        delete_temp_files_if_exists(folder_helper)
 
-        # driver.manage().timeouts().implicitlyWait(5, TimeUnit.SECONDS)
+        print('Getting to file download page')
+
         download_button = driver.find_element(By.XPATH, "//a[contains(text(), 'Download')]")
         download_button.click()
 
@@ -84,20 +100,20 @@ def download_daily(folder_helper):
         daily_link = driver.find_element(By.XPATH, "//a[contains(text(), 'Daily')]")
         daily_link.click()
 
-        print("Including aftermarket")
+        print('Including aftermarket')
         sleep_time()
         aftermarket = driver.find_element(By.CSS_SELECTOR, "input[name='include_additional']")
         if not aftermarket.is_selected():
             aftermarket.click()
 
         sleep_time()
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
         prepare_button = driver.find_element(By.CSS_SELECTOR, "form[name='daily'] input[type='submit']")
 
         sleep_time()
         prepare_button.click()
 
-        print("Downloading")
+        print('Downloading')
         sleep_time()
         input_valid_values = ['Download!', 'Download']
         download_button = None
@@ -105,16 +121,16 @@ def download_daily(folder_helper):
             try:
                 download_button = driver.find_element(By.CSS_SELECTOR, "form input[value='" + value + "']")
                 break
-            except Exception as exc:
-                # print(exc)
+            except Exception:
                 pass
         if download_button is None:
-            raise Exception("Download button not found")
+            msg = 'Download button not found'
+            raise Exception(msg)
 
         download_button.click()
 
         while not is_download_finished(folder_helper):
-            print("Waiting for download to finish")
+            print('Waiting for download to finish')
             time.sleep(10)
 
     except Exception as exc:
@@ -127,7 +143,8 @@ def get_downloaded_file(folder_helper) -> str:
     """Gets the downloaded file."""
     downloaded_files = sorted(Path(folder_helper.download).glob('*.zip'))
     if len(downloaded_files) == 0:
-        raise Exception("No downloaded file")
+        msg = 'No downloaded files found'
+        raise Exception(msg)
     return downloaded_files[-1]
 
 
@@ -148,7 +165,7 @@ def download_dats(folder_helper: Folders):
     try:
         downloaded_file = get_downloaded_file(folder_helper)
     except Exception as exc:
-        logging.error(exc)
+        logging.exception("Error downloading dats")
         return
     print('Extracting dats')
     extract_dats(downloaded_file, folder_helper)
@@ -156,7 +173,7 @@ def download_dats(folder_helper: Folders):
 
 
 def fetch():
-    folder_helper = Folders(seed=__preffix__)
+    folder_helper = Folders(seed=__prefix__)
     folder_helper.clean_dats()
     folder_helper.create_all()
     download_dats(folder_helper)

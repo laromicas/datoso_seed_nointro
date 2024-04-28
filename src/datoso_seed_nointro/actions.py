@@ -4,19 +4,19 @@ actions = {
     '{dat_origin}': [
         {
             'action': 'LoadDatFile',
-            '_class': NoIntroDat
+            '_class': NoIntroDat,
         },
         {
-            'action': 'DeleteOld'
+            'action': 'DeleteOld',
         },
         {
             'action': 'Copy',
-            'folder': '{dat_destination}'
+            'folder': '{dat_destination}',
         },
         {
-            'action': 'SaveToDatabase'
-        }
-    ]
+            'action': 'SaveToDatabase',
+        },
+    ],
 }
 
 def get_actions():
