@@ -121,11 +121,11 @@ def download_daily(folder_helper):
             try:
                 download_button = driver.find_element(By.CSS_SELECTOR, "form input[value='" + value + "']")
                 break
-            except Exception:
+            except Exception: # noqa: S110, BLE001
                 pass
         if download_button is None:
             msg = 'Download button not found'
-            raise Exception(msg)
+            raise LookupError(msg) # noqa: TRY301
 
         download_button.click()
 
@@ -133,7 +133,7 @@ def download_daily(folder_helper):
             print('Waiting for download to finish')
             time.sleep(10)
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         print(exc)
 
     driver.close()
@@ -164,8 +164,8 @@ def download_dats(folder_helper: Folders):
     download_daily(folder_helper)
     try:
         downloaded_file = get_downloaded_file(folder_helper)
-    except Exception as exc:
-        logging.exception("Error downloading dats")
+    except Exception:
+        logging.exception('Error downloading dats')
         return
     print('Extracting dats')
     extract_dats(downloaded_file, folder_helper)

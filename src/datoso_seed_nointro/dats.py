@@ -1,5 +1,4 @@
 import os
-from pprint import pprint
 import re
 
 from datoso.configuration import config
