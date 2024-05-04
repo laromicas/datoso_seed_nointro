@@ -1,5 +1,5 @@
 import logging
-import random
+import secrets
 import time
 import zipfile
 from pathlib import Path
@@ -30,7 +30,7 @@ def execute_with_retry(method, max_attempts):
 
 def sleep_time():
     """Sleeps for a random time."""
-    time.sleep(random.random() * 3 + 4)
+    time.sleep(secrets.random() * 3 + 4)
 
 
 def is_download_finished(folder_helper) -> bool:
@@ -64,6 +64,7 @@ def downloads_disabled(driver) -> bool:
 
 def download_daily(folder_helper):
     """Downloads the Datomatic Love Pack."""
+    # ruff: noqa: FBT003
     options = FirefoxOptions()
     if config.getboolean('NOINTRO', 'headless', fallback=True):
         options.add_argument('--headless')

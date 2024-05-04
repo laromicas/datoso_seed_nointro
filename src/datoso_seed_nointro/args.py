@@ -3,8 +3,10 @@ from datoso.configuration import config
 
 def seed_args(parser):
     headless = parser.add_mutually_exclusive_group()
-    headless.add_argument('-vi', '--visible', action='store_const', help='Run with browser visible', dest='headless', const=False)
-    headless.add_argument('-hl', '--headless', action='store_const', help='Run with browser headless (default)', dest='headless', const=True)
+    headless.add_argument('-vi', '--visible', action='store_const', help='Run with browser visible',
+                          dest='headless', const=False)
+    headless.add_argument('-hl', '--headless', action='store_const', help='Run with browser headless (default)',
+                          dest='headless', const=True)
     parser.set_defaults(headless=None)
 
 def post_parser(args):

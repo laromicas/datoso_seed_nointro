@@ -36,7 +36,8 @@ class NoIntroDat(XMLDatFile):
             prefixes.append(name_array.pop(0))
             self.modifier = 'Source Code'
         union = config.get('GENERAL', 'UnionCharacter')
-        if len(name_array) > 2:
+        expected_name_position = 2
+        if len(name_array) > expected_name_position:
             name_array[1] = f'{name_array[1]} {union} {name_array.pop()}'
 
         if len(name_array) == 1:
