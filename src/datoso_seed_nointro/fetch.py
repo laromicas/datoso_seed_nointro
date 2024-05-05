@@ -1,5 +1,5 @@
 import logging
-import secrets
+import random
 import time
 import zipfile
 from pathlib import Path
@@ -30,7 +30,7 @@ def execute_with_retry(method, max_attempts):
 
 def sleep_time():
     """Sleeps for a random time."""
-    time.sleep(secrets.random() * 3 + 4)
+    time.sleep(random.random() * 3 + 4)  # noqa: S311
 
 
 def is_download_finished(folder_helper) -> bool:
