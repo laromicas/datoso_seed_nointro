@@ -3,7 +3,7 @@ import re
 
 from datoso.configuration import config
 from datoso.helpers import is_date
-from datoso.repositories.dat import ClrMameProDatFile, XMLDatFile
+from datoso.repositories.dat_file import ClrMameProDatFile, XMLDatFile
 
 
 class NoIntroDat(XMLDatFile):
