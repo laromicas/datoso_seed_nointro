@@ -64,7 +64,7 @@ def downloads_disabled(driver) -> bool:
 
 def download_daily(folder_helper):
     """Downloads the Datomatic Love Pack."""
-    # ruff: noqa: FBT003
+    # ruff: noqa: FBT003, PLR0915
     options = FirefoxOptions()
     if config.getboolean('NOINTRO', 'headless', fallback=True):
         options.add_argument('--headless')
