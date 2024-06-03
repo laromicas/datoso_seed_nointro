@@ -22,7 +22,7 @@ def execute_with_retry(method: Callable, max_attempts: int) -> None:
     for _ in range(max_attempts):
         try:
             return method()
-        except Exception as exc:  # noqa: BLE001, PERF203
+        except Exception as exc:  # noqa: BLE001
             print(exc)
             time.sleep(1)
     if exc is not None:
