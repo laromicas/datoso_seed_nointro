@@ -1,7 +1,9 @@
+"""Fetch and download DAT files."""
 import logging
 import random
 import time
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 
 from selenium import webdriver
@@ -14,13 +16,13 @@ from datoso.helpers import FileUtils
 from datoso_seed_nointro import __prefix__
 
 
-def execute_with_retry(method, max_attempts):
-    """Executes a method with several times until it fails all or is executed fine."""
+def execute_with_retry(method: Callable, max_attempts: int) -> None:
+    """Execute a method with several times until it fails all or is executed fine."""
     exc = None
     for _ in range(max_attempts):
         try:
             return method()
-        except Exception as exc: # noqa: PERF203
+        except Exception as exc:  # noqa: BLE001, PERF203
             print(exc)
             time.sleep(1)
     if exc is not None:
@@ -28,13 +30,13 @@ def execute_with_retry(method, max_attempts):
     return None
 
 
-def sleep_time():
+def sleep_time() -> None:
     """Sleeps for a random time."""
     time.sleep(random.random() * 3 + 4)  # noqa: S311
 
 
-def is_download_finished(folder_helper) -> bool:
-    """Checks if the download is finished."""
+def is_download_finished(folder_helper: Folders) -> bool:
+    """Check if the download is finished."""
     firefox_temp_file = sorted(Path(folder_helper.download).glob('*.part'))
     chrome_temp_file = sorted(Path(folder_helper.download).glob('*.crdownload'))
     downloaded_files = sorted(Path(folder_helper.download).glob('*.zip'))
@@ -43,8 +45,8 @@ def is_download_finished(folder_helper) -> bool:
        (len(downloaded_files) >= 1)
 
 
-def delete_temp_files_if_exists(folder_helper: Folders):
-    """Checks if the files are in the folder."""
+def delete_temp_files_if_exists(folder_helper: Folders) -> None:
+    """Check if the files are in the folder."""
     firefox_temp_file = sorted(Path(folder_helper.download).glob('*.part'))
     chrome_temp_file = sorted(Path(folder_helper.download).glob('*.crdownload'))
     downloaded_files = sorted(Path(folder_helper.download).glob('*.zip'))
@@ -56,14 +58,14 @@ def delete_temp_files_if_exists(folder_helper: Folders):
         file.unlink()
 
 
-def downloads_disabled(driver) -> bool:
-    """Checks if the downloads in Datomatic are disabled."""
+def downloads_disabled(driver: webdriver.Firefox) -> bool:
+    """Check if the downloads in Datomatic are disabled."""
     words = ['temporary suspended', 'temporary disabled', 'services may be down', 'temporarily throttled']
     return any(word in driver.page_source for word in words)
 
 
-def download_daily(folder_helper):
-    """Downloads the Datomatic Love Pack."""
+def download_daily(folder_helper: Folders) -> None:
+    """Download the Datomatic Love Pack."""
     # ruff: noqa: FBT003, PLR0915
     options = FirefoxOptions()
     if config.getboolean('NOINTRO', 'headless', fallback=True):
@@ -140,8 +142,8 @@ def download_daily(folder_helper):
     driver.close()
 
 
-def get_downloaded_file(folder_helper) -> str:
-    """Gets the downloaded file."""
+def get_downloaded_file(folder_helper: Folders) -> str:
+    """Get the downloaded file."""
     downloaded_files = sorted(Path(folder_helper.download).glob('*.zip'))
     if len(downloaded_files) == 0:
         msg = 'No downloaded files found'
@@ -149,7 +151,8 @@ def get_downloaded_file(folder_helper) -> str:
     return downloaded_files[-1]
 
 
-def extract_dats(downloaded_file, folder_helper: Folders):
+def extract_dats(downloaded_file: str, folder_helper: Folders) -> None:
+    """Extract the DAT files."""
     with zipfile.ZipFile(downloaded_file, 'r') as zip_ref:
         filelist = zip_ref.filelist
         for file in filelist:
@@ -161,7 +164,8 @@ def extract_dats(downloaded_file, folder_helper: Folders):
             file.filename = file_name
 
 
-def download_dats(folder_helper: Folders):
+def download_dats(folder_helper: Folders) -> None:
+    """Download DAT files."""
     download_daily(folder_helper)
     try:
         downloaded_file = get_downloaded_file(folder_helper)
@@ -173,7 +177,8 @@ def download_dats(folder_helper: Folders):
     FileUtils.move(downloaded_file, folder_helper.backup)
 
 
-def fetch():
+def fetch() -> None:
+    """Fetch and download DAT files."""
     folder_helper = Folders(seed=__prefix__)
     folder_helper.clean_dats()
     folder_helper.create_all()

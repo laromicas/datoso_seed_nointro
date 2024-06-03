@@ -1,3 +1,4 @@
+"""NoIntro Dat classes."""
 import os
 import re
 

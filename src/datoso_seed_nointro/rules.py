@@ -1,3 +1,4 @@
+"""Rules for the No-Intro seed."""
 from datoso_seed_nointro.dats import NoIntroDat
 
 rules = [
@@ -22,5 +23,6 @@ rules = [
 ]
 
 
-def get_rules():
+def get_rules() -> list:
+    """Get the rules."""
     return rules

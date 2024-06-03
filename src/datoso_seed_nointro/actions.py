@@ -1,3 +1,4 @@
+"""Actions for the No-Intro seed."""
 from datoso_seed_nointro.dats import NoIntroDat
 
 actions = {
@@ -20,5 +21,6 @@ actions = {
     ],
 }
 
-def get_actions():
+def get_actions() -> dict:
+    """Get the actions dictionary."""
     return actions
