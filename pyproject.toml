@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 name        = "datoso_seed_nointro"
 description = "Python command line tool to download and organize your Rom Dat files."
 readme      = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license     = {text = "MIT License"}
 authors     = [
     {name = 'Lacides Miranda', email = 'laromicas@hotmail.com'},
@@ -22,7 +22,7 @@ classifiers = [
     'Topic :: System :: Emulators',
 ]
 dependencies = [
-    "datoso>=0.3.14",
+    "datoso>=1.0.0rc1",
     "selenium==4.8.3",
 ]
 dynamic = ["version"]

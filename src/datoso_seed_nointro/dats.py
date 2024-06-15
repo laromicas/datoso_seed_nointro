@@ -1,14 +1,19 @@
-import re
+"""NoIntro Dat classes."""
 import os
-from datoso.repositories.dat import ClrMameProDatFile, XMLDatFile
+import re
+
 from datoso.configuration import config
+from datoso.helpers import is_date
+from datoso.repositories.dat_file import ClrMameProDatFile, XMLDatFile
+
 
 class NoIntroDat(XMLDatFile):
-    """ NoIntro Dat class. """
+    """NoIntro Dat class."""
+
     seed: str = 'nointro'
 
     def initial_parse(self) -> list:
-        """ Parse the dat file. """
+        """Parse the dat file."""
         # pylint: disable=R0801
         name = self.name
 
@@ -26,14 +31,14 @@ class NoIntroDat(XMLDatFile):
             name_array.pop(0)
             if 'Magazine Scans' not in name:
                 suffixes.append('UnofficialDiscs')
-        # name_array = list(dict.fromkeys(name_array))
 
-        preffixes = []
+        prefixes = []
         if name_array[0] == 'Source Code':
-            preffixes.append(name_array.pop(0))
+            prefixes.append(name_array.pop(0))
             self.modifier = 'Source Code'
         union = config.get('GENERAL', 'UnionCharacter')
-        if len(name_array) > 2:
+        expected_name_position = 2
+        if len(name_array) > expected_name_position:
             name_array[1] = f'{name_array[1]} {union} {name_array.pop()}'
 
         if len(name_array) == 1:
@@ -43,38 +48,39 @@ class NoIntroDat(XMLDatFile):
         self.company = company
         self.system = system
         if suffixes:
-            self.suffix = os.path.join(*suffixes)
+            self.suffix = os.path.join(*suffixes) # noqa: PTH118
 
         self.suffixes = suffixes
         find_system = self.overrides()
         self.extra_configs(find_system)
 
         if self.modifier or self.system_type:
-            self.preffix = config.get('PREFFIXES', self.modifier or self.system_type, fallback='')
+            self.prefix = config.get('PREFIXES', self.modifier or self.system_type, fallback='')
         else:
-            self.preffix = None
+            self.prefix = None
 
-        return [self.preffix, self.company, self.system, self.suffix, self.get_date()]
+        return [self.prefix, self.company, self.system, self.suffix, self.get_date()]
 
 
     def get_date(self) -> str:
-        """ Get the date from the dat file. """
+        """Get the date from the dat file."""
         if self.date:
             return self.date
         if self.version:
             self.date = self.version
         if self.file:
-            result = re.findall(r'\(.*?\)', self.file)
+            result = re.findall(r'\(.*?\)', str(self.file))
             self.date = result[len(result)-1][1:-1]
-        return self.date
+        return self.date if is_date(self.date) else None
 
 
 class NoIntroClrMameDat(ClrMameProDatFile):
-    """ NoIntro Dat class. """
+    """NoIntro Dat class."""
+
     repo: str = 'nointro'
 
     def initial_parse(self) -> list:
-        """ Parse the dat file. """
+        """Parse the dat file."""
         # pylint: disable=R0801
         name = self.name
 
@@ -92,11 +98,11 @@ class NoIntroClrMameDat(ClrMameProDatFile):
 
         self.suffixes = suffixes
 
-        self.preffix = config['PREFFIXES'].get(self.modifier or self.system_type, '')
+        self.prefix = config['PREFIXES'].get(self.modifier or self.system_type, '')
 
-        return [self.preffix, self.company, self.system, self.suffix, self.get_date()]
+        return [self.prefix, self.company, self.system, self.suffix, self.get_date()]
 
     def get_date(self) -> str:
-        """ Get the date from the dat file. """
+        """Get the date from the dat file."""
         self.date = self.version
         return self.version
