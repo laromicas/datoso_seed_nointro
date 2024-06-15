@@ -11,7 +11,7 @@ No-Intro is a collection of DATs aimed for video game preservation especialized 
 
 ## Installation
 
-Datoso requires python 3.10+.
+Datoso requires python 3.11+.
 
 Install firefox and geckodriver, put geckodriver in your path.
 [Tutorial](https://www.browserstack.com/guide/geckodriver-selenium-python)
