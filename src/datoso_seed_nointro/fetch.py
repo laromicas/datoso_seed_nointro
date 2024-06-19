@@ -154,19 +154,11 @@ def get_downloaded_file(folder_helper: Folders) -> str:
 def extract_dats(downloaded_file: str, folder_helper: Folders) -> None:
     """Extract the DAT files."""
     with zipfile.ZipFile(downloaded_file, 'r') as zip_ref:
-        filelist = zip_ref.filelist
-        for file in filelist:
-            if file.filename.endswith('txt'):
-                continue
-            file_name = file.filename
-            file.filename = Path(file_name).name
-            zip_ref.extract(file, folder_helper.dats)
-            file.filename = file_name
+        zip_ref.extractall(folder_helper.dats)
 
 
 def download_dats(folder_helper: Folders) -> None:
     """Download DAT files."""
-    download_daily(folder_helper)
     try:
         downloaded_file = get_downloaded_file(folder_helper)
     except Exception:
