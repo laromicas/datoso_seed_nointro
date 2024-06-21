@@ -159,6 +159,7 @@ def extract_dats(downloaded_file: str, folder_helper: Folders) -> None:
 
 def download_dats(folder_helper: Folders) -> None:
     """Download DAT files."""
+    download_daily(folder_helper)
     try:
         downloaded_file = get_downloaded_file(folder_helper)
     except Exception:
