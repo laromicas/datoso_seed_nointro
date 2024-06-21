@@ -24,7 +24,7 @@ actions = {
 def get_actions() -> dict:
     """Get the actions dictionary."""
     # TODO(laromicas): Add the other folder to actions if selected.
-    # more_folders = ['Non-Game', 'Redump BIOS', 'Redump Custom']
+    # more_folders = ['Non-Game', 'Redump BIOS', 'Redump Custom']   # noqa: ERA001
     folders = ['No-Intro', 'Non-Redump', 'Source Code', 'Unofficial']
     new_actions = {}
     for folder in folders:

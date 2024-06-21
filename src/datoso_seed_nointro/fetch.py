@@ -147,7 +147,7 @@ def get_downloaded_file(folder_helper: Folders) -> str:
     downloaded_files = sorted(Path(folder_helper.download).glob('*.zip'))
     if len(downloaded_files) == 0:
         msg = 'No downloaded files found'
-        raise Exception(msg)
+        raise Exception(msg) # noqa: TRY002
     return downloaded_files[-1]
 
 
