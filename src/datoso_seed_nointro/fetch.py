@@ -14,6 +14,7 @@ from datoso.configuration import config
 from datoso.configuration.folder_helper import Folders
 from datoso.helpers import FileUtils
 from datoso_seed_nointro import __prefix__
+from datoso_seed_nointro.common import get_categories
 
 
 def execute_with_retry(method: Callable, max_attempts: int) -> None:
@@ -74,7 +75,6 @@ def download_daily(folder_helper: Folders) -> None:
     options.set_preference('browser.download.folderList', 2)
     options.set_preference('browser.download.manager.showWhenStarting', False)
     options.set_preference('browser.download.dir', str(folder_helper.download))
-    options.set_preference('browser.download.folderList', 2)
 
     driver = webdriver.Firefox(options=options)
 
@@ -103,13 +103,16 @@ def download_daily(folder_helper: Folders) -> None:
         daily_link = driver.find_element(By.XPATH, "//a[contains(text(), 'Daily')]")
         daily_link.click()
 
-        print('Including aftermarket')
+        print('Including categories')
         sleep_time()
-        aftermarket = driver.find_element(By.CSS_SELECTOR, "input[name='include_additional']")
-        if not aftermarket.is_selected():
-            aftermarket.click()
 
-        sleep_time()
+        for category, metadata in get_categories():
+            category_link = driver.find_element(By.CSS_SELECTOR, "input[name='" + metadata['link'] + "']")
+            if not category_link.is_selected():
+                print(f'Including {category}')
+                category_link.click()
+                sleep_time()
+
         driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
         prepare_button = driver.find_element(By.CSS_SELECTOR, "form[name='daily'] input[type='submit']")
 

@@ -1,5 +1,6 @@
 """Actions for the No-Intro seed."""
 from datoso_seed_nointro.dats import NoIntroDat
+from datoso_seed_nointro.common import get_categories
 
 actions = {
     '{dat_origin}/{folder}': [
@@ -21,11 +22,11 @@ actions = {
     ],
 }
 
+
+
 def get_actions() -> dict:
     """Get the actions dictionary."""
-    # TODO(laromicas): Add the other folder to actions if selected.
-    # more_folders = ['Non-Game', 'Redump BIOS', 'Redump Custom']   # noqa: ERA001
-    folders = ['No-Intro', 'Non-Redump', 'Source Code', 'Unofficial']
+    folders = ['No-Intro'] + [metadata['folder'] for _, metadata in get_categories()]
     new_actions = {}
     for folder in folders:
         folder_name = '{dat_origin}/' + folder
