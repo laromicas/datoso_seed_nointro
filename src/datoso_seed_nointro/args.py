@@ -12,8 +12,10 @@ def seed_args(parser: ArgumentParser) -> ArgumentParser:
                           dest='headless', const=False)
     headless.add_argument('-hl', '--headless', action='store_const', help='Run with browser headless (default)',
                           dest='headless', const=True)
-    parser.add_argument('-i', '--include', nargs='+', choices=categories.keys(), help='Include categories not configured')
-    parser.add_argument('-e', '--exclude', nargs='+', choices=categories.keys(), help='Exclude categories')
+    parser.add_argument('-i', '--include', nargs='+',
+                        choices=categories.keys(), help='Include categories not configured')
+    parser.add_argument('-e', '--exclude', nargs='+',
+                        choices=categories.keys(), help='Exclude categories')
 
     parser.set_defaults(headless=None)
     return parser

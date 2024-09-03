@@ -1,6 +1,6 @@
 """Actions for the No-Intro seed."""
-from datoso_seed_nointro.dats import NoIntroDat
 from datoso_seed_nointro.common import get_categories
+from datoso_seed_nointro.dats import NoIntroDat
 
 actions = {
     '{dat_origin}/{folder}': [
