@@ -12,7 +12,7 @@ from selenium.webdriver.common.by import By
 
 from datoso.configuration import config
 from datoso.configuration.folder_helper import Folders
-from datoso.helpers import FileUtils
+from datoso.helpers.file_utils import move_path
 from datoso_seed_nointro import __prefix__
 from datoso_seed_nointro.common import get_categories
 
@@ -170,7 +170,7 @@ def download_dats(folder_helper: Folders) -> None:
         return
     print('Extracting dats')
     extract_dats(downloaded_file, folder_helper)
-    FileUtils.move(downloaded_file, folder_helper.backup)
+    move_path(downloaded_file, folder_helper.backup)
 
 
 def fetch() -> None:
