@@ -69,6 +69,11 @@ def download_daily(folder_helper: Folders) -> None:
     """Download the Datomatic Love Pack."""
     # ruff: noqa: FBT003, PLR0915
     options = FirefoxOptions()
+    # change user agent
+    options.set_preference('general.useragent.override', config.get('NOINTRO', 'user_agent', fallback="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"))
+    #change navigator platform
+    options.set_preference('general.platform.override', config.get('NOINTRO', 'platform', fallback='Win32'))
+
     if config.getboolean('NOINTRO', 'headless', fallback=True):
         options.add_argument('--headless')
     options.set_capability('marionette', True)
@@ -121,7 +126,7 @@ def download_daily(folder_helper: Folders) -> None:
 
         print('Downloading')
         sleep_time()
-        input_valid_values = ['Download!', 'Download']
+        input_valid_values = ['Download!!!!','Download!!!','Download!!','Download!', 'Download']
         download_button = None
         for value in input_valid_values:
             try:

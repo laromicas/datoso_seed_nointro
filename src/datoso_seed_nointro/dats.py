@@ -47,6 +47,12 @@ class NoIntroDat(XMLDatFile):
         company, system = name_array
         self.company = company
         self.system = system
+        if "(DoM Version)" in system:
+            self.system = system.split(' - ')[0]
+            suffixes = ['BIOS Images', 'DoM Version']
+        else:
+            self.system = system
+
         if suffixes:
             self.suffix = os.path.join(*suffixes) # noqa: PTH118
 
