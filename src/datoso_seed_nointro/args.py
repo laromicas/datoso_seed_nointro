@@ -34,7 +34,7 @@ def init_config() -> None:
     default_values = {
         'headless': 'True',
         'include_categories': '',
-        'exclude_categories': 'non_game,redump_custom,redump_bios',
+        'exclude_categories': '',
     }
     if not config.has_section('NOINTRO'):
         config['NOINTRO'] = default_values
