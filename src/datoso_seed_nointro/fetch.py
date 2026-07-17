@@ -1,18 +1,19 @@
 """Fetch and download DAT files."""
-import logging
 import random
+import shutil
 import time
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
 
+from datoso.configuration import config, logger
+from datoso.configuration.folder_helper import Folders
+from datoso.helpers.file_utils import move_path
 from selenium import webdriver
 from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.common.by import By
+from selenium.webdriver.firefox.service import Service
 
-from datoso.configuration import config
-from datoso.configuration.folder_helper import Folders
-from datoso.helpers.file_utils import move_path
 from datoso_seed_nointro import __prefix__
 from datoso_seed_nointro.common import get_categories
 
@@ -64,6 +65,17 @@ def downloads_disabled(driver: webdriver.Firefox) -> bool:
     words = ['temporary suspended', 'temporary disabled', 'services may be down', 'temporarily throttled']
     return any(word in driver.page_source for word in words)
 
+def get_geckodriver_path() -> str:
+    """Get the geckodriver path from configuration or default."""
+    geckodriver_path = config.get('NOINTRO', 'geckodriver_path', fallback=None)
+    if geckodriver_path is None:
+        # Try to find geckodriver in PATH
+        geckodriver_executable = shutil.which('geckodriver')
+        if geckodriver_executable:
+            return geckodriver_executable
+        # Fallback to 'geckodriver' and let Selenium handle it
+        return None
+    return geckodriver_path
 
 def download_daily(folder_helper: Folders) -> None:
     """Download the Datomatic Love Pack."""
@@ -76,13 +88,18 @@ def download_daily(folder_helper: Folders) -> None:
 
     if config.getboolean('NOINTRO', 'headless', fallback=True):
         options.add_argument('--headless')
-    options.set_capability('marionette', True)
+    # Marionette is enabled by default in modern Firefox
     options.set_preference('browser.download.folderList', 2)
     options.set_preference('browser.download.manager.showWhenStarting', False)
+    # Use WSL path for download directory since we're using Linux Firefox
     options.set_preference('browser.download.dir', str(folder_helper.download))
 
-    driver = webdriver.Firefox(options=options)
-
+    # Use Linux geckodriver
+    geckodriver_path = get_geckodriver_path()
+    service = Service(executable_path=geckodriver_path) if geckodriver_path is not None else None
+    driver = webdriver.Firefox(service=service, options=options)
+    # print([x for x in get_categories()])
+    # exit()
     driver.implicitly_wait(10)
     driver.get('https://www.google.com')
 
@@ -93,7 +110,7 @@ def download_daily(folder_helper: Folders) -> None:
     try:
         if downloads_disabled(driver):
             print('Downloads suspended')
-            logging.error(driver.page_source)
+            logger.error(driver.page_source)
             driver.close()
             return
 
@@ -119,18 +136,25 @@ def download_daily(folder_helper: Folders) -> None:
                 sleep_time()
 
         driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
-        prepare_button = driver.find_element(By.CSS_SELECTOR, "form[name='daily'] input[type='submit']")
-
+        # now the name is daily_dl_2026-05-30 (with the date of the day)
+            # <input type="submit" name="daily_dl_2026-05-30" value="Request">
+        request_button = driver.find_element(By.CSS_SELECTOR, "form input[type='submit'][value^='Request']")
+        request_button.click()
         sleep_time()
-        prepare_button.click()
 
         print('Downloading')
         sleep_time()
-        input_valid_values = ['Download!!!!','Download!!!','Download!!','Download!', 'Download']
+        input_valid_values = [
+            'Download....','Download!!!!',
+            'Download...','Download!!!',
+            'Download..','Download!!',
+            'Download.','Download!',
+            'Download',
+            ]
         download_button = None
         for value in input_valid_values:
             try:
-                download_button = driver.find_element(By.CSS_SELECTOR, "form input[value='" + value + "']")
+                download_button = driver.find_element(By.CSS_SELECTOR, "form input[type='submit'][value^='" + value + "']")
                 break
             except Exception: # noqa: S110, BLE001
                 pass
@@ -138,7 +162,14 @@ def download_daily(folder_helper: Folders) -> None:
             msg = 'Download button not found'
             raise LookupError(msg) # noqa: TRY301
 
-        download_button.click()
+        driver.execute_script('arguments[0].scrollIntoView(true);', download_button)
+        driver.execute_script('arguments[0].scrollIntoView({block: "center"});', download_button)
+        driver.execute_script("arguments[0].style.display = 'block';", download_button)
+        driver.execute_script("arguments[0].style.visibility = 'visible';", download_button)
+        driver.execute_script("arguments[0].style.opacity = '1';", download_button)
+
+        driver.execute_script('arguments[0].click();', download_button)
+        download_button.click() #noqa: ERA001 RUF100
 
         while not is_download_finished(folder_helper):
             print('Waiting for download to finish')
@@ -171,7 +202,7 @@ def download_dats(folder_helper: Folders) -> None:
     try:
         downloaded_file = get_downloaded_file(folder_helper)
     except Exception:
-        logging.exception('Error downloading dats')
+        logger.exception('Error downloading dats')
         return
     print('Extracting dats')
     extract_dats(downloaded_file, folder_helper)

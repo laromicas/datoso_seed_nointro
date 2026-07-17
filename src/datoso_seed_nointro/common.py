@@ -4,33 +4,44 @@ from collections.abc import Generator
 from datoso.configuration import config
 
 categories = {
-    'aftermarket': {
-        'folder': 'Aftermarket',
-        'link': 'set8',
-    },
-    'non_game': {
-        'folder': 'Non-Game',
-        'link': 'set5',
-    },
-    'non_redump': {
-        'folder': 'Non-Redump',
-        'link': 'set3',
-    },
-    'redump_custom': {
-        'folder': 'Redump Custom',
-        'link': 'set6',
-    },
-    'redump_bios': {
-        'folder': 'Redump BIOS',
-        'link': 'set7',
+    'no-intro': {
+        'folder': 'No-Intro',
+        'link': 'set[1]',
     },
     'source_code': {
         'folder': 'Source Code',
-        'link': 'set2',
+        'link': 'set[2]',
     },
     'unofficial': {
         'folder': 'Unofficial',
-        'link': 'set4',
+        'link': 'set[3]',
+    },
+    'non_redump': {
+        'folder': 'Non-Redump',
+        'link': 'set[4]',
+    },
+    'non_game': {
+        'folder': 'Non-Game',
+        'link': 'set[5]',
+    },
+    'redump_custom': {
+        'folder': 'Redump Custom',
+        'link': 'set_redump_custom',
+    },
+    'redump_bios': {
+        'folder': 'Redump BIOS',
+        'link': 'set_redump_bios',
+    },
+    'aftermarket': {
+        'folder': 'Aftermarket',
+        'link': 'include_aftermarket',
+    },
+}
+
+ignored_categories = {
+    'numbered': {
+        'folder': 'Numbered Archives',
+        'link': 'include_numbered',
     },
 }
 
