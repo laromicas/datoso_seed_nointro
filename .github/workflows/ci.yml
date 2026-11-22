@@ -1,0 +1,42 @@
+# Managed by datoso-dev (`datoso-dev ci sync`). Do not edit here: change the template in
+# datoso_dev_updater/src/datoso_dev/templates/ci.yml and run `datoso-dev ci sync` again.
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install (dependency floors resolve from PyPI)
+        run: |
+          python -m pip install uv
+          uv pip install --system -e . ruff pytest
+      - name: Lint (pyflakes + syntax errors only; style is checked with the workspace config)
+        run: ruff check --isolated --select E4,E7,E9,F .
+      - name: Import every module
+        run: |
+          python - <<'PY'
+          import importlib
+          import pkgutil
+
+          import datoso_seed_nointro as package
+
+          for module in pkgutil.walk_packages(package.__path__, package.__name__ + '.'):
+              importlib.import_module(module.name)
+              print('imported', module.name)
+          PY
+      - name: datoso doctor
+        run: datoso doctor nointro
+      - name: Tests
+        if: hashFiles('tests/**') != ''
+        run: pytest
