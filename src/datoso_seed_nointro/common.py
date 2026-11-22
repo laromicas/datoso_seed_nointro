@@ -12,6 +12,10 @@ categories = {
         'folder': 'Source Code',
         'link': 'set[2]',
     },
+    'source_code_aftermarket': {
+        'folder': 'Source Code/Aftermarket',
+        'link': 'set[2]',
+    },
     'unofficial': {
         'folder': 'Unofficial',
         'link': 'set[3]',
@@ -32,16 +36,16 @@ categories = {
         'folder': 'Redump BIOS',
         'link': 'set_redump_bios',
     },
-    'aftermarket': {
-        'folder': 'Aftermarket',
-        'link': 'include_aftermarket',
-    },
 }
 
 ignored_categories = {
     'numbered': {
         'folder': 'Numbered Archives',
         'link': 'include_numbered',
+    },
+    'aftermarket': {
+        'folder': 'Aftermarket',
+        'link': 'include_aftermarket',
     },
 }
 

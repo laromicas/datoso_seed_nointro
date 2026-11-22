@@ -26,7 +26,7 @@ actions = {
 
 def get_actions() -> dict:
     """Get the actions dictionary."""
-    folders = ['No-Intro'] + [metadata['folder'] for _, metadata in get_categories()]
+    folders = ['No-Intro','No-Intro/Aftermarket'] + [metadata['folder'] for _, metadata in get_categories()]
     new_actions = {}
     for folder in folders:
         folder_name = '{dat_origin}/' + folder
