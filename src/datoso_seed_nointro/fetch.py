@@ -68,7 +68,7 @@ def downloads_disabled(driver: webdriver.Firefox) -> bool:
     return any(word in driver.page_source for word in words)
 
 def accept_terms(driver: webdriver.Firefox) -> None:
-    """Pass the Terms and Conditions gate (shown to every new session since 2026-11) if it is there."""
+    """Accept the Terms and Conditions page if shown."""
     accept = driver.find_elements(By.CSS_SELECTOR, "form input[type='submit'][name='terms_accept']")
     if accept:
         print('Accepting Terms and Conditions')
@@ -76,17 +76,17 @@ def accept_terms(driver: webdriver.Firefox) -> None:
         sleep_time()
 
 
-DOWNLOAD_NAME = 'download_file'  # <input type="submit" name="download_file" value="Download!!">
+DOWNLOAD_NAME = 'download_file'
 BUTTONS = "input[type='submit'], input[type='button'], button"
 
 
 def button_label(element: WebElement) -> str:
-    """Letters of a button's label, lowercased: 'Download!!', 'DOWNLOAD...' and 'D-o-w-n-l-o-a-d' -> 'download'."""
+    """Button label as lowercase letters only ('Download!!' -> 'download')."""
     label = element.get_attribute('value') if element.tag_name == 'input' else element.get_attribute('textContent')
     return re.sub(r'[^a-z]', '', (label or '').lower())
 
 
-# Why a person could NOT see or click ``arguments[0]`` ('' = they can). Bot traps hide decoy buttons with any of these.
+# Returns why a button is hidden, or '' if visible. Hidden buttons may be bot traps.
 HIDDEN_REASON_JS = """
 const el = arguments[0];
 if (el.disabled) return 'disabled';
@@ -115,19 +115,14 @@ return '';
 
 
 def is_download_candidate(button: WebElement) -> bool:
-    """``name="download_file"``, or a label that reads 'download' once case and punctuation are ignored."""
+    """Whether the button looks like the Download button."""
     return button.get_attribute('name') == DOWNLOAD_NAME or button_label(button).startswith('download')
 
 
 def pick_download_button(
     buttons: list[WebElement], daily_form_buttons: list[WebElement], hidden_reason: Callable[[WebElement], str],
 ) -> WebElement:
-    """Choose the pack's Download button, whose label changes on every request ('Download!!', 'Download...', …).
-
-    Only a button a person can see and click counts (``hidden_reason`` returns ''): hidden decoys with the same name or
-    label are bot traps. It must be the **only** such button; anything ambiguous raises instead of guessing.
-    Fallback when nothing reads 'download': the only usable button of the daily form besides 'Request'.
-    """
+    """Return the only visible Download button; raise if there is none or more than one."""
     candidates = [button for button in buttons if is_download_candidate(button)]
     usable, hidden = [], []
     for button in candidates:
@@ -161,7 +156,7 @@ def find_download_button(driver: webdriver.Firefox) -> WebElement:
 
 
 def click_once(element: WebElement) -> None:
-    """Click it once, like a person. No script-click fallback: if Firefox can't click it, a person couldn't either."""
+    """Click once, natively (no script click)."""
     element.click()
 
 
@@ -245,7 +240,7 @@ def download_daily(folder_helper: Folders) -> None:
 
         print('Downloading')
         sleep_time()
-        download_button = find_download_button(driver)  # already scrolled into view by the visibility check
+        download_button = find_download_button(driver)
         click_once(download_button)
 
         while not is_download_finished(folder_helper):

@@ -38,7 +38,7 @@ categories = {
     },
     'aftermarket': {
         'folder': 'No-Intro/Aftermarket',
-        'link': 'include_aftermarket',  # "Include: Aftermarket" on the Daily page
+        'link': 'include_aftermarket',
     },
 }
 

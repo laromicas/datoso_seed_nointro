@@ -1,4 +1,4 @@
-"""Choosing Datomatic's Download button: its label changes on every request, and hidden decoys must never be clicked."""
+"""Tests for picking Datomatic's Download button."""
 
 import pytest
 
