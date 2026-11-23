@@ -1,5 +1,6 @@
 """Fetch and download DAT files."""
 import random
+import re
 import shutil
 import time
 import zipfile
@@ -13,6 +14,7 @@ from selenium import webdriver
 from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.remote.webelement import WebElement
 
 from datoso_seed_nointro import __prefix__
 from datoso_seed_nointro.common import get_categories
@@ -65,6 +67,122 @@ def downloads_disabled(driver: webdriver.Firefox) -> bool:
     words = ['temporary suspended', 'temporary disabled', 'services may be down', 'temporarily throttled']
     return any(word in driver.page_source for word in words)
 
+def accept_terms(driver: webdriver.Firefox) -> None:
+    """Accept the Terms and Conditions page if shown."""
+    found = driver.find_elements(By.CSS_SELECTOR, "form input[type='submit'][name='terms_accept']")
+    if any(not hidden_reason(driver, element) for element in found):
+        print('Accepting Terms and Conditions')
+        click_once(pick_visible(found, lambda element: hidden_reason(driver, element), 'I accept'))
+        sleep_time()
+
+
+DOWNLOAD_NAME = 'download_file'
+BUTTONS = "input[type='submit'], input[type='button'], button"
+
+
+def button_label(element: WebElement) -> str:
+    """Button label as lowercase letters only ('Download!!' -> 'download')."""
+    label = element.get_attribute('value') if element.tag_name == 'input' else element.get_attribute('textContent')
+    return re.sub(r'[^a-z]', '', (label or '').lower())
+
+
+# Returns why a button is hidden, or '' if visible. Hidden buttons may be bot traps.
+HIDDEN_REASON_JS = """
+const el = arguments[0];
+if (el.disabled) return 'disabled';
+if (el.type === 'hidden') return 'type=hidden';
+if (el.closest('[hidden], [aria-hidden="true"], [inert]')) return 'hidden/aria-hidden/inert';
+const style = getComputedStyle(el);
+if (style.visibility !== 'visible') return 'visibility:' + style.visibility;
+if (style.pointerEvents === 'none') return 'pointer-events:none';
+let opacity = 1;
+for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
+  const s = getComputedStyle(node);
+  if (s.display === 'none') return 'display:none';
+  if (s.clipPath && s.clipPath !== 'none') return 'clip-path';
+  if (s.clip && s.clip !== 'auto') return 'clip';
+  opacity *= parseFloat(s.opacity);
+}
+if (opacity < 0.5) return 'opacity ' + opacity.toFixed(2);
+el.scrollIntoView({block: 'center', inline: 'center'});
+const r = el.getBoundingClientRect();
+if (r.width < 8 || r.height < 8) return 'too small ' + Math.round(r.width) + 'x' + Math.round(r.height);
+if (r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight) return 'off-screen';
+const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+if (!top || !(top === el || el.contains(top))) return 'covered by another element';
+return '';
+"""
+
+
+def is_download_candidate(button: WebElement) -> bool:
+    """Whether the button looks like the Download button."""
+    return button.get_attribute('name') == DOWNLOAD_NAME or button_label(button).startswith('download')
+
+
+def pick_download_button(
+    buttons: list[WebElement], daily_form_buttons: list[WebElement], reason: Callable[[WebElement], str],
+) -> WebElement:
+    """Return the only visible Download button; raise if there is none or more than one."""
+    candidates = [button for button in buttons if is_download_candidate(button)]
+    usable, hidden = [], []
+    for button in candidates:
+        why = reason(button)
+        (hidden if why else usable).append((button, why))
+    if hidden:
+        print(f'Ignoring {len(hidden)} hidden download-like button(s): {[why for _, why in hidden]}')
+    if len(usable) == 1:
+        return usable[0][0]
+    if len(usable) > 1:
+        msg = f'{len(usable)} visible download-like buttons, refusing to guess: {[button_label(b) for b, _ in usable]}'
+        raise LookupError(msg)
+    if not candidates:
+        others = [b for b in daily_form_buttons if button_label(b) != 'request' and not reason(b)]
+        if len(others) == 1:
+            return others[0]
+    msg = f'Download button not found (buttons: {[button_label(button) for button in buttons]})'
+    raise LookupError(msg)
+
+
+def hidden_reason(driver: webdriver.Firefox, element: WebElement) -> str:
+    """Why the element is hidden from a person, or '' if visible."""
+    return driver.execute_script(HIDDEN_REASON_JS, element)
+
+
+def pick_visible(elements: list[WebElement], reason: Callable[[WebElement], str], what: str) -> WebElement:
+    """Return the only visible element; raise if there is none or more than one."""
+    reasons = [reason(element) for element in elements]
+    hidden = [why for why in reasons if why]
+    visible = [element for element, why in zip(elements, reasons, strict=True) if not why]
+    if hidden:
+        print(f'Ignoring {len(hidden)} hidden {what}: {hidden}')
+    if len(visible) != 1:
+        msg = f'Expected one visible {what}, found {len(visible)}'
+        raise LookupError(msg)
+    return visible[0]
+
+
+def find_visible(driver: webdriver.Firefox, by: str, selector: str, what: str) -> WebElement:
+    """Find the only visible element matching the selector."""
+    return pick_visible(driver.find_elements(by, selector), lambda element: hidden_reason(driver, element), what)
+
+
+def find_download_button(driver: webdriver.Firefox) -> WebElement:
+    """Find the Download button shown after 'Request'."""
+    driver.implicitly_wait(0)
+    try:
+        buttons = driver.find_elements(By.CSS_SELECTOR, BUTTONS)
+        daily_form = ', '.join(f"form[name='daily'] {button}" for button in BUTTONS.split(', '))
+        in_form = driver.find_elements(By.CSS_SELECTOR, daily_form)
+        return pick_download_button(buttons, in_form, lambda button: hidden_reason(driver, button))
+    finally:
+        driver.implicitly_wait(10)
+
+
+def click_once(element: WebElement) -> None:
+    """Click once, natively (no script click)."""
+    element.click()
+
+
 def get_geckodriver_path() -> str:
     """Get the geckodriver path from configuration or default."""
     geckodriver_path = config.get('NOINTRO', 'geckodriver_path', fallback=None)
@@ -79,7 +197,7 @@ def get_geckodriver_path() -> str:
 
 def download_daily(folder_helper: Folders) -> None:
     """Download the Datomatic Love Pack."""
-    # ruff: noqa: FBT003, PLR0915
+    # ruff: noqa: FBT003
     options = FirefoxOptions()
     # change user agent
     options.set_preference('general.useragent.override', config.get('NOINTRO', 'user_agent', fallback="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"))
@@ -108,6 +226,7 @@ def download_daily(folder_helper: Folders) -> None:
     sleep_time()
 
     try:
+        accept_terms(driver)
         if downloads_disabled(driver):
             print('Downloads suspended')
             logger.error(driver.page_source)
@@ -118,58 +237,33 @@ def download_daily(folder_helper: Folders) -> None:
 
         print('Getting to file download page')
 
-        download_button = driver.find_element(By.XPATH, "//a[contains(text(), 'Download')]")
-        download_button.click()
+        click_once(find_visible(driver, By.XPATH, "//a[contains(text(), 'Download')]", 'Download link'))
 
         sleep_time()
-        daily_link = driver.find_element(By.XPATH, "//a[contains(text(), 'Daily')]")
-        daily_link.click()
+        click_once(find_visible(driver, By.XPATH, "//a[contains(text(), 'Daily')]", 'Daily link'))
 
         print('Including categories')
         sleep_time()
 
         for category, metadata in get_categories():
-            category_link = driver.find_element(By.CSS_SELECTOR, "input[name='" + metadata['link'] + "']")
-            if not category_link.is_selected():
+            selector = f"input[name='{metadata['link']}']"
+            checkbox = find_visible(driver, By.CSS_SELECTOR, selector, f'{category} checkbox')
+            if not checkbox.is_selected():
                 print(f'Including {category}')
-                category_link.click()
+                click_once(checkbox)
                 sleep_time()
 
         driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
         # now the name is daily_dl_2026-05-30 (with the date of the day)
             # <input type="submit" name="daily_dl_2026-05-30" value="Request">
-        request_button = driver.find_element(By.CSS_SELECTOR, "form input[type='submit'][value^='Request']")
-        request_button.click()
+        request = "form input[type='submit'][value^='Request']"
+        click_once(find_visible(driver, By.CSS_SELECTOR, request, 'Request button'))
         sleep_time()
 
         print('Downloading')
         sleep_time()
-        input_valid_values = [
-            'Download....','Download!!!!',
-            'Download...','Download!!!',
-            'Download..','Download!!',
-            'Download.','Download!',
-            'Download',
-            ]
-        download_button = None
-        for value in input_valid_values:
-            try:
-                download_button = driver.find_element(By.CSS_SELECTOR, "form input[type='submit'][value^='" + value + "']")
-                break
-            except Exception: # noqa: S110, BLE001
-                pass
-        if download_button is None:
-            msg = 'Download button not found'
-            raise LookupError(msg) # noqa: TRY301
-
-        driver.execute_script('arguments[0].scrollIntoView(true);', download_button)
-        driver.execute_script('arguments[0].scrollIntoView({block: "center"});', download_button)
-        driver.execute_script("arguments[0].style.display = 'block';", download_button)
-        driver.execute_script("arguments[0].style.visibility = 'visible';", download_button)
-        driver.execute_script("arguments[0].style.opacity = '1';", download_button)
-
-        driver.execute_script('arguments[0].click();', download_button)
-        download_button.click() #noqa: ERA001 RUF100
+        download_button = find_download_button(driver)
+        click_once(download_button)
 
         while not is_download_finished(folder_helper):
             print('Waiting for download to finish')

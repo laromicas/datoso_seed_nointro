@@ -36,16 +36,16 @@ categories = {
         'folder': 'Redump BIOS',
         'link': 'set_redump_bios',
     },
+    'aftermarket': {
+        'folder': 'No-Intro/Aftermarket',
+        'link': 'include_aftermarket',
+    },
 }
 
 ignored_categories = {
     'numbered': {
         'folder': 'Numbered Archives',
         'link': 'include_numbered',
-    },
-    'aftermarket': {
-        'folder': 'Aftermarket',
-        'link': 'include_aftermarket',
     },
 }
 
