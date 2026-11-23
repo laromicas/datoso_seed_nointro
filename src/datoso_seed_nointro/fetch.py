@@ -69,10 +69,10 @@ def downloads_disabled(driver: webdriver.Firefox) -> bool:
 
 def accept_terms(driver: webdriver.Firefox) -> None:
     """Accept the Terms and Conditions page if shown."""
-    accept = driver.find_elements(By.CSS_SELECTOR, "form input[type='submit'][name='terms_accept']")
-    if accept:
+    found = driver.find_elements(By.CSS_SELECTOR, "form input[type='submit'][name='terms_accept']")
+    if any(not hidden_reason(driver, element) for element in found):
         print('Accepting Terms and Conditions')
-        accept[0].click()
+        click_once(pick_visible(found, lambda element: hidden_reason(driver, element), 'I accept'))
         sleep_time()
 
 
@@ -106,7 +106,7 @@ for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
 if (opacity < 0.5) return 'opacity ' + opacity.toFixed(2);
 el.scrollIntoView({block: 'center', inline: 'center'});
 const r = el.getBoundingClientRect();
-if (r.width < 20 || r.height < 10) return 'too small ' + Math.round(r.width) + 'x' + Math.round(r.height);
+if (r.width < 8 || r.height < 8) return 'too small ' + Math.round(r.width) + 'x' + Math.round(r.height);
 if (r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight) return 'off-screen';
 const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
 if (!top || !(top === el || el.contains(top))) return 'covered by another element';
@@ -120,27 +120,50 @@ def is_download_candidate(button: WebElement) -> bool:
 
 
 def pick_download_button(
-    buttons: list[WebElement], daily_form_buttons: list[WebElement], hidden_reason: Callable[[WebElement], str],
+    buttons: list[WebElement], daily_form_buttons: list[WebElement], reason: Callable[[WebElement], str],
 ) -> WebElement:
     """Return the only visible Download button; raise if there is none or more than one."""
     candidates = [button for button in buttons if is_download_candidate(button)]
     usable, hidden = [], []
     for button in candidates:
-        reason = hidden_reason(button)
-        (hidden if reason else usable).append((button, reason))
+        why = reason(button)
+        (hidden if why else usable).append((button, why))
     if hidden:
-        print(f'Ignoring {len(hidden)} hidden download-like button(s): {[reason for _, reason in hidden]}')
+        print(f'Ignoring {len(hidden)} hidden download-like button(s): {[why for _, why in hidden]}')
     if len(usable) == 1:
         return usable[0][0]
     if len(usable) > 1:
         msg = f'{len(usable)} visible download-like buttons, refusing to guess: {[button_label(b) for b, _ in usable]}'
         raise LookupError(msg)
     if not candidates:
-        others = [b for b in daily_form_buttons if button_label(b) != 'request' and not hidden_reason(b)]
+        others = [b for b in daily_form_buttons if button_label(b) != 'request' and not reason(b)]
         if len(others) == 1:
             return others[0]
     msg = f'Download button not found (buttons: {[button_label(button) for button in buttons]})'
     raise LookupError(msg)
+
+
+def hidden_reason(driver: webdriver.Firefox, element: WebElement) -> str:
+    """Why the element is hidden from a person, or '' if visible."""
+    return driver.execute_script(HIDDEN_REASON_JS, element)
+
+
+def pick_visible(elements: list[WebElement], reason: Callable[[WebElement], str], what: str) -> WebElement:
+    """Return the only visible element; raise if there is none or more than one."""
+    reasons = [reason(element) for element in elements]
+    hidden = [why for why in reasons if why]
+    visible = [element for element, why in zip(elements, reasons, strict=True) if not why]
+    if hidden:
+        print(f'Ignoring {len(hidden)} hidden {what}: {hidden}')
+    if len(visible) != 1:
+        msg = f'Expected one visible {what}, found {len(visible)}'
+        raise LookupError(msg)
+    return visible[0]
+
+
+def find_visible(driver: webdriver.Firefox, by: str, selector: str, what: str) -> WebElement:
+    """Find the only visible element matching the selector."""
+    return pick_visible(driver.find_elements(by, selector), lambda element: hidden_reason(driver, element), what)
 
 
 def find_download_button(driver: webdriver.Firefox) -> WebElement:
@@ -150,7 +173,7 @@ def find_download_button(driver: webdriver.Firefox) -> WebElement:
         buttons = driver.find_elements(By.CSS_SELECTOR, BUTTONS)
         daily_form = ', '.join(f"form[name='daily'] {button}" for button in BUTTONS.split(', '))
         in_form = driver.find_elements(By.CSS_SELECTOR, daily_form)
-        return pick_download_button(buttons, in_form, lambda button: driver.execute_script(HIDDEN_REASON_JS, button))
+        return pick_download_button(buttons, in_form, lambda button: hidden_reason(driver, button))
     finally:
         driver.implicitly_wait(10)
 
@@ -214,28 +237,27 @@ def download_daily(folder_helper: Folders) -> None:
 
         print('Getting to file download page')
 
-        download_button = driver.find_element(By.XPATH, "//a[contains(text(), 'Download')]")
-        download_button.click()
+        click_once(find_visible(driver, By.XPATH, "//a[contains(text(), 'Download')]", 'Download link'))
 
         sleep_time()
-        daily_link = driver.find_element(By.XPATH, "//a[contains(text(), 'Daily')]")
-        daily_link.click()
+        click_once(find_visible(driver, By.XPATH, "//a[contains(text(), 'Daily')]", 'Daily link'))
 
         print('Including categories')
         sleep_time()
 
         for category, metadata in get_categories():
-            category_link = driver.find_element(By.CSS_SELECTOR, "input[name='" + metadata['link'] + "']")
-            if not category_link.is_selected():
+            selector = f"input[name='{metadata['link']}']"
+            checkbox = find_visible(driver, By.CSS_SELECTOR, selector, f'{category} checkbox')
+            if not checkbox.is_selected():
                 print(f'Including {category}')
-                category_link.click()
+                click_once(checkbox)
                 sleep_time()
 
         driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
         # now the name is daily_dl_2026-05-30 (with the date of the day)
             # <input type="submit" name="daily_dl_2026-05-30" value="Request">
-        request_button = driver.find_element(By.CSS_SELECTOR, "form input[type='submit'][value^='Request']")
-        request_button.click()
+        request = "form input[type='submit'][value^='Request']"
+        click_once(find_visible(driver, By.CSS_SELECTOR, request, 'Request button'))
         sleep_time()
 
         print('Downloading')

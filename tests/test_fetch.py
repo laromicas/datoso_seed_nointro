@@ -2,7 +2,7 @@
 
 import pytest
 
-from datoso_seed_nointro.fetch import button_label, pick_download_button
+from datoso_seed_nointro.fetch import button_label, pick_download_button, pick_visible
 
 
 class Button:
@@ -66,3 +66,14 @@ def test_form_fallback_ignores_hidden_buttons():
         pick([REQUEST], [REQUEST, Button('Get pack', 'zz'), Button('Get', 'yy')])
     real = Button('Get pack', 'zz')
     assert pick([REQUEST], [REQUEST, real, Button('Get', 'yy', hidden='clip')]) is real
+
+
+def test_pick_visible_skips_hidden_copies():
+    real = Button('Daily')
+    assert pick_visible([Button('Daily', hidden='display:none'), real], reason, 'Daily link') is real
+
+
+@pytest.mark.parametrize('elements', [[], [Button('Daily', hidden='off-screen')], [Button('Daily'), Button('Daily')]])
+def test_pick_visible_needs_exactly_one(elements):
+    with pytest.raises(LookupError, match='Expected one visible Daily link'):
+        pick_visible(elements, reason, 'Daily link')
