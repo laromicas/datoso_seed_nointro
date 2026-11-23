@@ -1,5 +1,6 @@
 """Fetch and download DAT files."""
 import random
+import re
 import shutil
 import time
 import zipfile
@@ -13,6 +14,7 @@ from selenium import webdriver
 from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.remote.webelement import WebElement
 
 from datoso_seed_nointro import __prefix__
 from datoso_seed_nointro.common import get_categories
@@ -65,6 +67,104 @@ def downloads_disabled(driver: webdriver.Firefox) -> bool:
     words = ['temporary suspended', 'temporary disabled', 'services may be down', 'temporarily throttled']
     return any(word in driver.page_source for word in words)
 
+def accept_terms(driver: webdriver.Firefox) -> None:
+    """Pass the Terms and Conditions gate (shown to every new session since 2026-11) if it is there."""
+    accept = driver.find_elements(By.CSS_SELECTOR, "form input[type='submit'][name='terms_accept']")
+    if accept:
+        print('Accepting Terms and Conditions')
+        accept[0].click()
+        sleep_time()
+
+
+DOWNLOAD_NAME = 'download_file'  # <input type="submit" name="download_file" value="Download!!">
+BUTTONS = "input[type='submit'], input[type='button'], button"
+
+
+def button_label(element: WebElement) -> str:
+    """Letters of a button's label, lowercased: 'Download!!', 'DOWNLOAD...' and 'D-o-w-n-l-o-a-d' -> 'download'."""
+    label = element.get_attribute('value') if element.tag_name == 'input' else element.get_attribute('textContent')
+    return re.sub(r'[^a-z]', '', (label or '').lower())
+
+
+# Why a person could NOT see or click ``arguments[0]`` ('' = they can). Bot traps hide decoy buttons with any of these.
+HIDDEN_REASON_JS = """
+const el = arguments[0];
+if (el.disabled) return 'disabled';
+if (el.type === 'hidden') return 'type=hidden';
+if (el.closest('[hidden], [aria-hidden="true"], [inert]')) return 'hidden/aria-hidden/inert';
+const style = getComputedStyle(el);
+if (style.visibility !== 'visible') return 'visibility:' + style.visibility;
+if (style.pointerEvents === 'none') return 'pointer-events:none';
+let opacity = 1;
+for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
+  const s = getComputedStyle(node);
+  if (s.display === 'none') return 'display:none';
+  if (s.clipPath && s.clipPath !== 'none') return 'clip-path';
+  if (s.clip && s.clip !== 'auto') return 'clip';
+  opacity *= parseFloat(s.opacity);
+}
+if (opacity < 0.5) return 'opacity ' + opacity.toFixed(2);
+el.scrollIntoView({block: 'center', inline: 'center'});
+const r = el.getBoundingClientRect();
+if (r.width < 20 || r.height < 10) return 'too small ' + Math.round(r.width) + 'x' + Math.round(r.height);
+if (r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight) return 'off-screen';
+const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+if (!top || !(top === el || el.contains(top))) return 'covered by another element';
+return '';
+"""
+
+
+def is_download_candidate(button: WebElement) -> bool:
+    """``name="download_file"``, or a label that reads 'download' once case and punctuation are ignored."""
+    return button.get_attribute('name') == DOWNLOAD_NAME or button_label(button).startswith('download')
+
+
+def pick_download_button(
+    buttons: list[WebElement], daily_form_buttons: list[WebElement], hidden_reason: Callable[[WebElement], str],
+) -> WebElement:
+    """Choose the pack's Download button, whose label changes on every request ('Download!!', 'Download...', …).
+
+    Only a button a person can see and click counts (``hidden_reason`` returns ''): hidden decoys with the same name or
+    label are bot traps. It must be the **only** such button; anything ambiguous raises instead of guessing.
+    Fallback when nothing reads 'download': the only usable button of the daily form besides 'Request'.
+    """
+    candidates = [button for button in buttons if is_download_candidate(button)]
+    usable, hidden = [], []
+    for button in candidates:
+        reason = hidden_reason(button)
+        (hidden if reason else usable).append((button, reason))
+    if hidden:
+        print(f'Ignoring {len(hidden)} hidden download-like button(s): {[reason for _, reason in hidden]}')
+    if len(usable) == 1:
+        return usable[0][0]
+    if len(usable) > 1:
+        msg = f'{len(usable)} visible download-like buttons, refusing to guess: {[button_label(b) for b, _ in usable]}'
+        raise LookupError(msg)
+    if not candidates:
+        others = [b for b in daily_form_buttons if button_label(b) != 'request' and not hidden_reason(b)]
+        if len(others) == 1:
+            return others[0]
+    msg = f'Download button not found (buttons: {[button_label(button) for button in buttons]})'
+    raise LookupError(msg)
+
+
+def find_download_button(driver: webdriver.Firefox) -> WebElement:
+    """Find the Download button shown after 'Request'."""
+    driver.implicitly_wait(0)
+    try:
+        buttons = driver.find_elements(By.CSS_SELECTOR, BUTTONS)
+        daily_form = ', '.join(f"form[name='daily'] {button}" for button in BUTTONS.split(', '))
+        in_form = driver.find_elements(By.CSS_SELECTOR, daily_form)
+        return pick_download_button(buttons, in_form, lambda button: driver.execute_script(HIDDEN_REASON_JS, button))
+    finally:
+        driver.implicitly_wait(10)
+
+
+def click_once(element: WebElement) -> None:
+    """Click it once, like a person. No script-click fallback: if Firefox can't click it, a person couldn't either."""
+    element.click()
+
+
 def get_geckodriver_path() -> str:
     """Get the geckodriver path from configuration or default."""
     geckodriver_path = config.get('NOINTRO', 'geckodriver_path', fallback=None)
@@ -79,7 +179,7 @@ def get_geckodriver_path() -> str:
 
 def download_daily(folder_helper: Folders) -> None:
     """Download the Datomatic Love Pack."""
-    # ruff: noqa: FBT003, PLR0915
+    # ruff: noqa: FBT003
     options = FirefoxOptions()
     # change user agent
     options.set_preference('general.useragent.override', config.get('NOINTRO', 'user_agent', fallback="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"))
@@ -108,6 +208,7 @@ def download_daily(folder_helper: Folders) -> None:
     sleep_time()
 
     try:
+        accept_terms(driver)
         if downloads_disabled(driver):
             print('Downloads suspended')
             logger.error(driver.page_source)
@@ -144,32 +245,8 @@ def download_daily(folder_helper: Folders) -> None:
 
         print('Downloading')
         sleep_time()
-        input_valid_values = [
-            'Download....','Download!!!!',
-            'Download...','Download!!!',
-            'Download..','Download!!',
-            'Download.','Download!',
-            'Download',
-            ]
-        download_button = None
-        for value in input_valid_values:
-            try:
-                download_button = driver.find_element(By.CSS_SELECTOR, "form input[type='submit'][value^='" + value + "']")
-                break
-            except Exception: # noqa: S110, BLE001
-                pass
-        if download_button is None:
-            msg = 'Download button not found'
-            raise LookupError(msg) # noqa: TRY301
-
-        driver.execute_script('arguments[0].scrollIntoView(true);', download_button)
-        driver.execute_script('arguments[0].scrollIntoView({block: "center"});', download_button)
-        driver.execute_script("arguments[0].style.display = 'block';", download_button)
-        driver.execute_script("arguments[0].style.visibility = 'visible';", download_button)
-        driver.execute_script("arguments[0].style.opacity = '1';", download_button)
-
-        driver.execute_script('arguments[0].click();', download_button)
-        download_button.click() #noqa: ERA001 RUF100
+        download_button = find_download_button(driver)  # already scrolled into view by the visibility check
+        click_once(download_button)
 
         while not is_download_finished(folder_helper):
             print('Waiting for download to finish')
