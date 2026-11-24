@@ -1,8 +1,12 @@
 """Tests for picking Datomatic's Download button."""
 
-import pytest
+from types import SimpleNamespace
 
-from datoso_seed_nointro.fetch import button_label, pick_download_button, pick_visible
+import pytest
+from datoso.configuration import config
+
+from datoso_seed_nointro import fetch
+from datoso_seed_nointro.fetch import FetchSteps, button_label, downloaded_size, pick_download_button, pick_visible
 
 
 class Button:
@@ -77,3 +81,29 @@ def test_pick_visible_skips_hidden_copies():
 def test_pick_visible_needs_exactly_one(elements):
     with pytest.raises(LookupError, match='Expected one visible Daily link'):
         pick_visible(elements, reason, 'Daily link')
+
+
+def test_steps_advance_and_label(monkeypatch):
+    monkeypatch.setitem(config['COMMAND'], 'Quiet', 'true')
+    with FetchSteps(3) as steps:
+        steps.step('Opening Datomatic')
+        task = steps.progress.tasks[0]
+        assert (task.completed, task.description) == (0, 'Opening Datomatic')  # the first step only starts
+        steps.step('Downloading')
+        steps.label('Downloading (1.0 MB)')
+        assert (task.completed, task.description) == (1, 'Downloading (1.0 MB)')
+        steps.finish('Fetched')
+        assert (task.completed, task.total, task.description) == (3, 3, 'Fetched')
+        assert steps.progress.disable
+
+
+def test_total_steps_counts_categories(monkeypatch):
+    monkeypatch.setattr(fetch, 'get_categories', lambda: iter([('a', {}), ('b', {})]))
+    assert fetch.total_steps() == fetch.FIXED_STEPS + 2 + 1
+
+
+def test_downloaded_size(tmp_path):
+    folders = SimpleNamespace(download=tmp_path)
+    assert downloaded_size(folders) == ''
+    (tmp_path / 'pack.zip.part').write_bytes(b'0' * 2_500_000)
+    assert downloaded_size(folders) == '2.5 MB'
