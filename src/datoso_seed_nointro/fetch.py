@@ -6,10 +6,12 @@ import time
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
+from typing import Self
 
 from datoso.configuration import config, logger
 from datoso.configuration.folder_helper import Folders
 from datoso.helpers.file_utils import move_path
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from selenium import webdriver
 from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.common.by import By
@@ -18,6 +20,54 @@ from selenium.webdriver.remote.webelement import WebElement
 
 from datoso_seed_nointro import __prefix__
 from datoso_seed_nointro.common import get_categories
+
+FIXED_STEPS = 7  # open site, terms, download page, categories, request, download, wait (+ extract and categories)
+
+
+class FetchSteps:
+    """One progress bar for the fetch: each Selenium step advances it and becomes its label."""
+
+    def __init__(self, total: int) -> None:
+        """Bar of ``total`` steps, hidden with --quiet."""
+        self.progress = Progress(
+            SpinnerColumn(), TextColumn('{task.description}'), BarColumn(), MofNCompleteColumn(), TimeElapsedColumn(),
+            disable=config.getboolean('COMMAND', 'Quiet', fallback=False),
+        )  # fmt: skip
+        self.task = self.progress.add_task('Starting', total=total)
+        self.started = False
+
+    def __enter__(self) -> Self:  # noqa: D105
+        self.progress.start()
+        return self
+
+    def __exit__(self, *exc: object) -> None:  # noqa: D105
+        self.progress.stop()
+
+    def step(self, description: str) -> None:
+        """Finish the current step and start ``description``."""
+        self.progress.update(self.task, advance=1 if self.started else 0, description=description)
+        self.started = True
+
+    def label(self, description: str) -> None:
+        """Change the current step's label without advancing."""
+        self.progress.update(self.task, description=description)
+
+    def finish(self, description: str = 'Done') -> None:
+        """Finish the last step."""
+        task = self.progress.tasks[0]
+        self.progress.update(self.task, completed=task.total, description=description)
+
+
+def total_steps() -> int:
+    """Count the steps of a full fetch: the fixed ones, one per category, and extracting."""
+    return FIXED_STEPS + len(list(get_categories())) + 1
+
+
+def downloaded_size(folder_helper: Folders) -> str:
+    """Size of the file Firefox is writing (``*.part``), e.g. ``12.3 MB``, or empty."""
+    parts = sorted(Path(folder_helper.download).glob('*.part'))
+    size = sum(part.stat().st_size for part in parts if part.exists())
+    return f'{size / 1_000_000:.1f} MB' if size else ''
 
 
 def execute_with_retry(method: Callable, max_attempts: int) -> None:
@@ -67,11 +117,14 @@ def downloads_disabled(driver: webdriver.Firefox) -> bool:
     words = ['temporary suspended', 'temporary disabled', 'services may be down', 'temporarily throttled']
     return any(word in driver.page_source for word in words)
 
-def accept_terms(driver: webdriver.Firefox) -> None:
+def accept_terms(driver: webdriver.Firefox, steps: FetchSteps | None = None) -> None:
     """Accept the Terms and Conditions page if shown."""
     found = driver.find_elements(By.CSS_SELECTOR, "form input[type='submit'][name='terms_accept']")
     if any(not hidden_reason(driver, element) for element in found):
-        print('Accepting Terms and Conditions')
+        if steps:
+            steps.label('Accepting Terms and Conditions')
+        else:
+            print('Accepting Terms and Conditions')
         click_once(pick_visible(found, lambda element: hidden_reason(driver, element), 'I accept'))
         sleep_time()
 
@@ -195,7 +248,7 @@ def get_geckodriver_path() -> str:
         return None
     return geckodriver_path
 
-def download_daily(folder_helper: Folders) -> None:
+def download_daily(folder_helper: Folders, steps: FetchSteps) -> None:  # noqa: PLR0915
     """Download the Datomatic Love Pack."""
     # ruff: noqa: FBT003
     options = FirefoxOptions()
@@ -219,6 +272,7 @@ def download_daily(folder_helper: Folders) -> None:
     # print([x for x in get_categories()])
     # exit()
     driver.implicitly_wait(10)
+    steps.step('Opening Datomatic')
     driver.get('https://www.google.com')
 
     driver.get('https://datomatic.no-intro.org')
@@ -226,8 +280,11 @@ def download_daily(folder_helper: Folders) -> None:
     sleep_time()
 
     try:
-        accept_terms(driver)
+        steps.step('Checking Terms and Conditions')
+        accept_terms(driver, steps)
         if downloads_disabled(driver):
+            steps.label('Downloads suspended')
+            steps.progress.stop()
             print('Downloads suspended')
             logger.error(driver.page_source)
             driver.close()
@@ -235,39 +292,42 @@ def download_daily(folder_helper: Folders) -> None:
 
         delete_temp_files_if_exists(folder_helper)
 
-        print('Getting to file download page')
+        steps.step('Getting to file download page')
 
         click_once(find_visible(driver, By.XPATH, "//a[contains(text(), 'Download')]", 'Download link'))
 
         sleep_time()
         click_once(find_visible(driver, By.XPATH, "//a[contains(text(), 'Daily')]", 'Daily link'))
 
-        print('Including categories')
+        steps.step('Including categories')
         sleep_time()
 
         for category, metadata in get_categories():
+            steps.step(f'Including {category}')
             selector = f"input[name='{metadata['link']}']"
             checkbox = find_visible(driver, By.CSS_SELECTOR, selector, f'{category} checkbox')
             if not checkbox.is_selected():
-                print(f'Including {category}')
                 click_once(checkbox)
                 sleep_time()
 
         driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
         # now the name is daily_dl_2026-05-30 (with the date of the day)
             # <input type="submit" name="daily_dl_2026-05-30" value="Request">
+        steps.step('Requesting the pack')
         request = "form input[type='submit'][value^='Request']"
         click_once(find_visible(driver, By.CSS_SELECTOR, request, 'Request button'))
         sleep_time()
 
-        print('Downloading')
+        steps.step('Downloading')
         sleep_time()
         download_button = find_download_button(driver)
         click_once(download_button)
 
+        steps.step('Waiting for download to finish')
         while not is_download_finished(folder_helper):
-            print('Waiting for download to finish')
-            time.sleep(10)
+            size = downloaded_size(folder_helper)
+            steps.label(f'Waiting for download to finish ({size})' if size else 'Waiting for download to finish')
+            time.sleep(2)
 
     except Exception as exc:  # noqa: BLE001
         print(exc)
@@ -291,16 +351,19 @@ def extract_dats(downloaded_file: str, folder_helper: Folders) -> None:
 
 
 def download_dats(folder_helper: Folders) -> None:
-    """Download DAT files."""
-    download_daily(folder_helper)
-    try:
-        downloaded_file = get_downloaded_file(folder_helper)
-    except Exception:
-        logger.exception('Error downloading dats')
-        return
-    print('Extracting dats')
-    extract_dats(downloaded_file, folder_helper)
-    move_path(downloaded_file, folder_helper.backup)
+    """Download DAT files, with one progress bar over all the steps."""
+    with FetchSteps(total_steps()) as steps:
+        download_daily(folder_helper, steps)
+        try:
+            downloaded_file = get_downloaded_file(folder_helper)
+        except Exception:  # noqa: BLE001
+            steps.progress.stop()
+            logger.exception('Error downloading dats')
+            return
+        steps.step('Extracting dats')
+        extract_dats(downloaded_file, folder_helper)
+        move_path(downloaded_file, folder_helper.backup)
+        steps.finish('Fetched')
 
 
 def fetch() -> None:
