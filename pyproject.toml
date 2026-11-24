@@ -22,7 +22,7 @@ classifiers = [
     'Topic :: System :: Emulators',
 ]
 dependencies = [
-    "datoso>=1.1.1",
+    "datoso>=1.3.0",
     "rich>=15.0.0",
     "selenium==4.54.0",
 ]
